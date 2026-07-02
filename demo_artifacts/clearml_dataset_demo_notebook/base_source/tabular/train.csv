@@ -1,0 +1,4 @@
+sample_id,feature,label
+1,0.1,low
+2,0.45,mid
+3,0.9,high
