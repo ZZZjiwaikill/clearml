@@ -54,7 +54,7 @@ CPU demo（最小 print + 上报少量 scalar）：
 python docs/agent_demo/cpu_print_task.py
 ```
 
-GPU demo（MNIST 最小训练，TensorBoard 标量会被 ClearML 自动捕获）：
+GPU demo（MNIST 最小训练；如果环境里有 TensorBoard 则用 `SummaryWriter` 写标量并被 ClearML 自动捕获，否则会自动回退到 `logger.report_scalar`）：
 
 ```bash
 python docs/agent_demo/gpu_mnist_task.py
@@ -75,4 +75,4 @@ CLEARML_QUEUE=gpu MAX_STEPS=50 python docs/agent_demo/gpu_mnist_task.py
 
 - 你本地运行脚本后会“很快退出”，因为 `execute_remotely(..., exit_process=True)` 会把任务丢进队列后结束本地进程
 - ClearML Web UI 中 Task 状态从 Pending -> In Progress -> Completed
-- GPU demo 会在 Console 里打印 loss，并在 Scalars 中看到 `train/loss` 曲线（来自 TensorBoard 的 `SummaryWriter.add_scalar`）
+- GPU demo 会在 Console 里打印 loss，并在 Scalars 中看到 `train/loss` 曲线（优先来自 TensorBoard；缺少 TensorBoard 时走 ClearML Logger 回退）

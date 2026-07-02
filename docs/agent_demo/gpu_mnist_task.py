@@ -19,16 +19,20 @@ def main() -> None:
     import torch.nn as nn
     import torch.optim as optim
     from torch.utils.data import DataLoader
-    from torch.utils.tensorboard import SummaryWriter
     from torchvision.datasets import MNIST
     from torchvision.transforms import ToTensor
+    try:
+        from torch.utils.tensorboard import SummaryWriter
+
+        writer = SummaryWriter()
+    except ModuleNotFoundError:
+        writer = None
+        logger = task.get_logger()
 
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA is not available on this machine")
 
     device = torch.device("cuda:0")
-
-    writer = SummaryWriter()
 
     train_data = MNIST("data", train=True, download=True, transform=ToTensor())
     train_loader = DataLoader(
@@ -61,7 +65,10 @@ def main() -> None:
         optimizer.step()
 
         loss_value = float(loss.item())
-        writer.add_scalar("train/loss", loss_value, step)
+        if writer is not None:
+            writer.add_scalar("train/loss", loss_value, step)
+        else:
+            logger.report_scalar(title="train", series="loss", iteration=step, value=loss_value)
         if step % 20 == 0:
             print(f"step={step} loss={loss_value:.6f}")
 
@@ -69,10 +76,10 @@ def main() -> None:
         if step >= max_steps:
             break
 
-    writer.close()
+    if writer is not None:
+        writer.close()
     task.close()
 
 
 if __name__ == "__main__":
     main()
-
