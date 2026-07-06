@@ -74,6 +74,11 @@ task = Task.init(
 - 继续上次执行并保留历史：`continue_last_task=True`
   - 适合“断点续跑/追加训练”，历史 artifacts/models/logs 保留，新的上报会在历史最大 iteration 基础上继续
 
+补充说明：
+
+- 是否会“自动新建一个 Task”不只取决于你当前代码，也取决于后台是否已有同名任务、任务状态（例如已发布/归档）以及是否已有产物等
+- 如果你希望“每次运行都得到一个全新的实验记录”，优先用 `reuse_last_task_id=False`，结果最可预测
+
 示例：每次都创建一个全新的 Task（推荐给“实验对比”场景）
 
 ```python
