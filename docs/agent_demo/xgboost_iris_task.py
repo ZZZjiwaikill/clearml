@@ -2,11 +2,16 @@ import argparse
 from pathlib import Path
 
 import xgboost as xgb
-from clearml import Task
+from clearml import OutputModel, Task
 from sklearn.datasets import load_iris
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
-
+"""
+这个代码脚本是一个“普通脚本型 ClearML Task”
+- 只有 Task.init() ， 没有 task.execute_remotely() ，见 xgboost_iris_task.py:L36-L41
+- 所以你 直接运行这个 .py 时，任务会在你当前这台机器本地执行；你后台启动的 1 个 CPU agent 和 2 个 GPU agent 不会接手这个任务
+- 只有当你在 ClearML 平台上把这个任务 Clone 之后再 Enqueue 到某个队列，agent 才会真正参与执行
+"""
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -26,6 +31,17 @@ def parse_args() -> argparse.Namespace:
         "--model-path",
         default="best_model.json",
         help="Where to save the trained XGBoost model.",
+    )
+    parser.add_argument(
+        "--model-name",
+        default="xgboost_iris_model",
+        help="ClearML model entity name shown in the Models UI.",
+    )
+    parser.add_argument(
+        "--publish-model",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Publish the registered ClearML model after upload.",
     )
     return parser.parse_args()
 
@@ -55,7 +71,7 @@ def main() -> None:
         "nthread": 4,
         "eval_metric": "rmse",
     }
-    task.connect(params)
+    params = task.connect(params)
 
     booster = xgb.train(
         params,
@@ -80,6 +96,35 @@ def main() -> None:
     model_path = Path(args.model_path)
     model_path.parent.mkdir(parents=True, exist_ok=True)
     booster.save_model(model_path.as_posix())
+
+    output_model = OutputModel(task=task, name=args.model_name, framework="XGBoost")
+    output_model.update_design(config_dict=params)
+    output_model.set_metadata("task_id", task.id, v_type="str")
+    output_model.set_metadata("dataset", "sklearn.datasets.load_iris", v_type="str")
+    output_model.set_metadata("model_path", model_path.as_posix(), v_type="str")
+    output_model.set_metadata("test_accuracy", str(float(accuracy)), v_type="float")
+    output_model.update_weights(weights_filename=model_path.as_posix())
+    output_model.report_single_value(name="test_accuracy", value=float(accuracy))
+    output_model.tags = ["xgboost", "iris", "ready-for-serving"]
+    if args.publish_model:
+        output_model.publish()
+
+    task.upload_artifact(
+        name="serving_manifest",
+        artifact_object={
+            "task_id": task.id,
+            "model_id": output_model.id,
+            "model_name": args.model_name,
+            "model_path": model_path.as_posix(),
+            "published": bool(args.publish_model),
+            "test_accuracy": float(accuracy),
+        },
+    )
+    print(f"Registered ClearML model id: {output_model.id}")
+    print(
+        "Model registered under Models. To appear in Models Endpoints, deploy this model "
+        "with ClearML Serving / clearml-serving using the model_id above."
+    )
     task.close()
 
 

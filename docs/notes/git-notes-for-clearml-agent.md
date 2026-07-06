@@ -49,12 +49,16 @@
 
 根因：
 
-- 你本地提交了 commit，但没有 push 到远端。
-- agent 只能从 `repository=<远端URL>` 拉代码，所以远端没有这个 commit 时就无法 checkout。
+- 你本地提交了 commit，但这个 commit 不在 agent 要拉取的远端仓库里。
+  - 当时 Task 记录的 `repository` 还是原作者的 `clearml/clearml` 官方仓库（你没有权限 push 到那个远端）
+  - 所以对 agent 来说：远端仓库里根本不存在该 commit，checkout 必然失败
+- agent 只能从 `repository=<远端URL>` 拉代码并 checkout `version_num=<commit>`，无法读取你本地磁盘上的提交历史。
 
 解决动作（关键思想：让 commit 在远端可见）：
 
-- 把提交 push 到你 fork 的 GitHub 仓库（而不是官方仓库）
+- 先 fork 官方仓库到你自己的 GitHub 账号下
+- 把本地仓库 `origin` 的 push URL 指向你的 fork（而不是官方仓库）
+- 把提交 push 到你的 fork（这样 agent 才能 fetch/checkout 到该 commit）
 - 重新运行 demo 产生新 Task（新 Task 里记录的 commit 必须是远端可访问的）
 
 ### 2.3 问题 C：push 被拒绝（rejected, fetch first / non-fast-forward）
@@ -69,9 +73,9 @@
 - 远端分支（例如 `origin/master`）上已经有提交，而你本地分支历史不包含它。
 - Git 默认不允许用“非 fast-forward”的方式覆盖远端分支历史。
 
-方案（我们采用的是方案 A：推新分支，最稳妥）：
+方案（我们最终采用的是方案 A：推新分支，最稳妥）：
 
-- 不强行推 `master`，推一个新分支用于远程执行：
+- 不强行推 `master`（避免与 fork 仓库现有历史冲突），推一个新分支用于远程执行：
 
 ```bash
 git fetch origin
@@ -197,4 +201,3 @@ git remote set-url origin git@github.com:<user>/<repo>.git
 3. Task 里显示的 `entry_point` 路径在该 commit 中是否存在
 4. 执行机是否具备访问远端仓库的权限（SSH key / PAT）
 5. agent 是否被旧缓存干扰（必要时清理 `~/.clearml/vcs-cache` 对应 repo 缓存）
-
